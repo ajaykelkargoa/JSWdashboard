@@ -162,6 +162,7 @@
     <script type="text/babel">
         window.onload = function() {
             const { useState, useEffect } = React;
+            const ReactDOM = window.ReactDOM; // Access ReactDOM from window
 
             const colors = {
               primaryDarkBlue: '#0A2342',
@@ -935,7 +936,9 @@
             };
 
             // Mount the React app to the root div
-            ReactDOM.render(<App />, document.getElementById('root'));
+            const container = document.getElementById('root');
+            const root = ReactDOM.createRoot(container); // Use createRoot
+            root.render(<App />); // Render the App
         }; // End of window.onload
     </script>
 </body>
