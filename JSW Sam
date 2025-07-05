@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSW Paints 360-Degree Feedback Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- React and ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transformation in browser (for development only) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #333333; /* Apply global text color */
+        }
+        /* Custom Bar Chart Styles */
+        .custom-bar-chart-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 300px; /* Fixed height for consistency */
+            padding: 20px 0; /* Vertical padding only */
+            box-sizing: border-box;
+            justify-content: space-around;
+        }
+        .custom-bar-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px; /* Space between bars */
+            position: relative;
+            height: 28px; /* Height of each bar row */
+        }
+        .custom-bar-label {
+            font-size: 0.875rem; /* text-sm */
+            color: #333333; /* textDark */
+            min-width: 100px; /* Ensure label space */
+            text-align: right;
+            padding-right: 10px;
+        }
+        .custom-bar-wrapper {
+            flex-grow: 1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        .custom-bar-background {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background-color: #E0E6ED; /* secondaryLightBlue */
+            border-radius: 4px;
+            width: 100%; /* Full width for background */
+        }
+        .custom-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            transition: width 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.875rem; /* text-sm */
+            overflow: hidden; /* Hide overflow text */
+        }
+        .custom-bar-value-overlay {
+            position: absolute;
+            right: 10px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            z-index: 2; /* Ensure value is on top */
+        }
+        .custom-bar-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .custom-bar-legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.875rem;
+            color: #666666;
+        }
+        .custom-bar-legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+
+        /* Custom Radar Chart Styles */
+        .custom-radar-chart-container {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .radar-svg {
+            overflow: visible; /* Allow labels to extend */
+        }
+        .radar-polygon {
+            stroke-width: 2;
+            fill-opacity: 0.8; /* Increased opacity for clarity */
+            transition: all 0.3s ease-in-out;
+        }
+        .radar-grid-line {
+            stroke: #E0E6ED; /* secondaryLightBlue */
+            stroke-width: 1;
+        }
+        .radar-axis-line {
+            stroke: #666666; /* textMuted */
+            stroke-width: 1;
+        }
+        .radar-axis-label {
+            font-size: 12px;
+            fill: #666666; /* textMuted */
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+        .radar-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+        .radar-legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: #333333;
+        }
+        .radar-legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div> <!-- This is where your React app will mount -->
+
+    <script type="text/babel">
+        window.onload = function() {
+            const { useState, useEffect } = React;
+
+            const colors = {
+              primaryDarkBlue: '#0A2342',
+              secondaryLightBlue: '#E0E6ED',
+              accentGold: '#F7B32B',
+              textDark: '#333333',
+              textMuted: '#666666',
+              positiveGreen: '#336600',
+              growthOrange: '#CC5200',
+              blindSpotRed: '#DC3545',
+              pleasantBlue: '#007BFF',
+              orgAverageTeal: '#009999',
+              gray: '#808080',
+              lightGray: '#F8F8F8'
+            };
+
+            const overallScores = [
+              { category: 'Self', score: 4.83, color: colors.positiveGreen },
+              { category: 'Excluding Self', score: 4.33, color: colors.primaryDarkBlue },
+              { category: 'Org Average', score: 4.03, color: colors.orgAverageTeal },
+              { category: 'Manager', score: 4.05, color: colors.growthOrange },
+              { category: 'Subordinate', score: 4.79, color: colors.gray },
+              { category: 'Peer', score: 4.15, color: colors.accentGold },
+              { category: 'HOD', score: 4.10, color: colors.textMuted }
+            ];
+
+            const strengthsData = [
+              {
+                sNo: 1,
+                behavior: "Demonstrates strong commercial acumen, examines factors like costs, budgets, revenue, and profitability while making decisions / taking action.",
+                competency: "Business Acumen",
+                excludingSelf: 4.62,
+                quote: "Sam has been leading from the front and has set up new bench marks ahead of times."
+              },
+              {
+                sNo: 2,
+                behavior: "Exhibits resilience in the face of setbacks / failures. Is quick to get back-up from failures and push for success",
+                competency: "Seizes Opportunities",
+                excludingSelf: 4.38,
+                quote: "Can do attitude, Speed and balancing commercial and execution priorities"
+              },
+              {
+                sNo: 3,
+                behavior: "Takes decisive action to capitalize on opportunities based on the evaluation of feasibility (benefits and risks)",
+                competency: "Seizes Opportunities",
+                excludingSelf: 4.38,
+                quote: "Courageous and bold"
+              }
+            ];
+
+            const developmentData = [
+              {
+                sNo: 1,
+                behavior: "Is up to date on business practices, strategies, metrics, issues and market trends (competition (existing and new entrants), consumers, technology) that impact the achievement of functional/organizational goals.",
+                competency: "Business Acumen",
+                excludingSelf: 3.92,
+                quote: "Sambandam should start working on his strategic skills. While he is sound on execution, can work on how to strategize and be a leader of a business."
+              },
+              {
+                sNo: 2,
+                behavior: "Combines the external and internal business perspective to create actionable strategies for the long-term",
+                competency: "Business Acumen",
+                excludingSelf: 4.23,
+                quote: "Need to take up new Role Changes and bring Diverse Proojects, extending his expertise in varied business needs and Challenges"
+              },
+              {
+                sNo: 3,
+                behavior: "Proactively identifies new business prospects",
+                competency: "Seizes Opportunities",
+                excludingSelf: 4.23,
+                quote: "Take initiave in the new role / profile. Networking"
+              }
+            ];
+
+            const blindSpotsData = [
+              {
+                subject: "Strategic Thinking",
+                self: 5.00,
+                excludingSelf: 3.92,
+              },
+              {
+                subject: "Delegation",
+                self: 4.00,
+                excludingSelf: 4.38,
+              },
+              {
+                subject: "External Awareness",
+                self: 5.00,
+                excludingSelf: 3.92,
+              }
+            ];
+
+            const pleasantSurprisesData = [
+              {
+                sNo: 1,
+                behavior: "Combines the external and internal business perspective to create actionable strategies for the long-term",
+                competency: "Business Acumen",
+                self: 4.00,
+                excludingSelf: 4.23
+              }
+            ];
+
+            const competencyDetails = [
+                // Business Acumen
+                { competency: "Business Acumen", category: "Self", avg: 4.67, orgAverage: 4.34 },
+                { competency: "Business Acumen", category: "Excluding Self", avg: 4.26, orgAverage: 4.05 },
+                { competency: "Business Acumen", category: "Manager", avg: 3.67, orgAverage: 3.58 },
+                { competency: "Business Acumen", category: "Subordinate", avg: 4.83, orgAverage: 4.27 },
+                { competency: "Business Acumen", category: "Peer", avg: 4.05, orgAverage: 4.09 },
+                { competency: "Business Acumen", category: "HOD", avg: 4.33, orgAverage: 3.44 },
+                // Seizes Opportunities
+                { competency: "Seizes Opportunities", category: "Self", avg: 5.00, orgAverage: 4.28 },
+                { competency: "Seizes Opportunities", category: "Excluding Self", avg: 4.33, orgAverage: 4.00 },
+                { competency: "Seizes Opportunities", category: "Manager", avg: 4.17, orgAverage: 3.57 },
+                { competency: "Seizes Opportunities", category: "Subordinate", avg: 4.75, orgAverage: 4.15 },
+                { competency: "Seizes Opportunities", category: "Peer", avg: 4.11, orgAverage: 4.04 },
+                { competency: "Seizes Opportunities", category: "HOD", avg: 4.33, orgAverage: 3.53 },
+                // Consumer Focus
+                { competency: "Consumer Focus", category: "Self", avg: 5.00, orgAverage: 4.42 },
+                { competency: "Consumer Focus", category: "Excluding Self", avg: 4.41, orgAverage: 4.07 },
+                { competency: "Consumer Focus", category: "Manager", avg: 4.00, orgAverage: 3.69 },
+                { competency: "Consumer Focus", category: "Subordinate", avg: 4.92, orgAverage: 4.19 },
+                { competency: "Consumer Focus", category: "Peer", avg: 4.22, orgAverage: 4.09 },
+                { competency: "Consumer Focus", category: "HOD", avg: 4.33, orgAverage: 3.61 },
+                // Ownership & Initiative
+                { competency: "Ownership & Initiative", category: "Self", avg: 4.67, orgAverage: 4.50 },
+                { competency: "Ownership & Initiative", category: "Excluding Self", avg: 4.43, orgAverage: 4.08 },
+                { competency: "Ownership & Initiative", category: "Manager", avg: 4.33, orgAverage: 3.84 },
+                { competency: "Ownership & Initiative", category: "Subordinate", avg: 5.00, orgAverage: 4.22 },
+                { competency: "Ownership & Initiative", category: "Peer", avg: 4.11, orgAverage: 4.08 },
+                { competency: "Ownership & Initiative", category: "HOD", avg: 4.33, orgAverage: 3.66 },
+                // Objective Driven
+                { competency: "Objective Driven", category: "Self", avg: 4.75, orgAverage: 4.46 },
+                { competency: "Objective Driven", category: "Excluding Self", avg: 4.46, orgAverage: 4.12 },
+                { competency: "Objective Driven", category: "Manager", avg: 4.25, orgAverage: 3.81 },
+                { competency: "Objective Driven", category: "Subordinate", avg: 4.81, orgAverage: 4.22 },
+                { competency: "Objective Driven", category: "Peer", avg: 4.34, orgAverage: 4.15 },
+                { competency: "Objective Driven", category: "HOD", avg: 4.25, orgAverage: 3.73 },
+                // Functionally Competent
+                { competency: "Functionally Competent", category: "Self", avg: 4.50, orgAverage: 4.39 },
+                { competency: "Functionally Competent", category: "Excluding Self", avg: 4.19, orgAverage: 4.09 },
+                { competency: "Functionally Competent", category: "Manager", avg: 3.50, orgAverage: 3.68 },
+                { competency: "Functionally Competent", category: "Subordinate", avg: 4.63, orgAverage: 4.23 },
+                { competency: "Functionally Competent", category: "Peer", avg: 4.17, orgAverage: 4.17 },
+                { competency: "Functionally Competent", category: "HOD", avg: 4.00, orgAverage: 3.32 },
+                // Demonstrates Execution Agility
+                { competency: "Demonstrates Execution Agility", category: "Self", avg: 5.00, orgAverage: 4.46 },
+                { competency: "Demonstrates Execution Agility", category: "Excluding Self", avg: 4.49, orgAverage: 4.10 },
+                { competency: "Demonstrates Execution Agility", category: "Manager", avg: 4.33, orgAverage: 3.76 },
+                { competency: "Demonstrates Execution Agility", category: "Subordinate", avg: 4.92, orgAverage: 4.25 },
+                { competency: "Demonstrates Execution Agility", category: "Peer", avg: 4.22, orgAverage: 4.12 },
+                { competency: "Demonstrates Execution Agility", category: "HOD", avg: 4.67, orgAverage: 3.70 },
+                // Thinks Out of the Box
+                { competency: "Thinks Out of the Box", category: "Self", avg: 4.67, orgAverage: 4.26 },
+                { competency: "Thinks Out of the Box", category: "Excluding Self", avg: 4.39, orgAverage: 3.90 },
+                { competency: "Thinks Out of the Box", category: "Manager", avg: 4.00, orgAverage: 3.51 },
+                { competency: "Thinks Out of the Box", category: "Subordinate", avg: 4.92, orgAverage: 4.14 },
+                { competency: "Thinks Out of the Box", category: "Peer", avg: 4.28, orgAverage: 3.91 },
+                { competency: "Thinks Out of the Box", category: "HOD", avg: 3.67, orgAverage: 3.30 },
+                // Drives Continuous Improvements
+                { competency: "Drives Continuous Improvements", category: "Self", avg: 5.00, orgAverage: 4.36 },
+                { competency: "Drives Continuous Improvements", category: "Excluding Self", avg: 4.31, orgAverage: 4.02 },
+                { competency: "Drives Continuous Improvements", category: "Manager", avg: 4.00, orgAverage: 3.54 },
+                { competency: "Drives Continuous Improvements", category: "Subordinate", avg: 4.75, orgAverage: 4.25 },
+                { competency: "Drives Continuous Improvements", category: "Peer", avg: 4.17, orgAverage: 4.04 },
+                { competency: "Drives Continuous Improvements", category: "HOD", avg: 4.00, orgAverage: 3.42 },
+                // Manages Change
+                { competency: "Manages Change", category: "Self", avg: 5.00, orgAverage: 4.30 },
+                { competency: "Manages Change", category: "Excluding Self", avg: 4.33, orgAverage: 3.93 },
+                { competency: "Manages Change", category: "Manager", avg: 4.33, orgAverage: 3.43 },
+                { competency: "Manages Change", category: "Subordinate", avg: 4.58, orgAverage: 4.07 },
+                { competency: "Manages Change", category: "Peer", avg: 4.28, orgAverage: 3.99 },
+                { competency: "Manages Change", category: "HOD", avg: 3.67, orgAverage: 3.42 },
+                // Empathetic & Builds the Culture
+                { competency: "Empathetic & Builds the Culture", category: "Self", avg: 4.67, orgAverage: 4.48 },
+                { competency: "Empathetic & Builds the Culture", category: "Excluding Self", avg: 4.26, orgAverage: 4.08 },
+                { competency: "Empathetic & Builds the Culture", category: "Manager", avg: 4.00, orgAverage: 3.72 },
+                { competency: "Empathetic & Builds the Culture", category: "Subordinate", avg: 4.92, orgAverage: 4.14 },
+                { competency: "Empathetic & Builds the Culture", category: "Peer", avg: 3.94, orgAverage: 4.13 },
+                { competency: "Empathetic & Builds the Culture", category: "HOD", avg: 4.00, orgAverage: 3.76 },
+                // Develops Talent
+                { competency: "Develops Talent", category: "Self", avg: 5.00, orgAverage: 4.47 },
+                { competency: "Develops Talent", category: "Excluding Self", avg: 4.07, orgAverage: 3.97 },
+                { competency: "Develops Talent", category: "Manager", avg: 4.00, orgAverage: 3.69 },
+                { competency: "Develops Talent", category: "Subordinate", avg: 4.50, orgAverage: 4.05 },
+                { competency: "Develops Talent", category: "Peer", avg: 3.89, orgAverage: 4.00 },
+                { competency: "Develops Talent", category: "HOD", avg: 3.67, orgAverage: 3.56 },
+            ];
+
+            const valuesDetails = [
+                // Commitment
+                { value: "Commitment", category: "Self", avg: 5.00, orgAverage: 4.50 },
+                { value: "Commitment", category: "Excluding Self", avg: 4.41, orgAverage: 4.12 },
+                { value: "Commitment", category: "Manager", avg: 4.25, orgAverage: 3.87 },
+                { value: "Commitment", category: "Subordinate", avg: 4.81, orgAverage: 4.18 },
+                { value: "Commitment", category: "Peer", avg: 4.13, orgAverage: 4.14 },
+                { value: "Commitment", category: "HOD", avg: 4.75, orgAverage: 3.85 },
+                // Courage
+                { value: "Courage", category: "Self", avg: 5.00, orgAverage: 4.44 },
+                { value: "Courage", category: "Excluding Self", avg: 4.58, orgAverage: 4.01 },
+                { value: "Courage", category: "Manager", avg: 4.50, orgAverage: 3.63 },
+                { value: "Courage", category: "Subordinate", avg: 4.75, orgAverage: 4.17 },
+                { value: "Courage", category: "Peer", avg: 4.46, orgAverage: 4.04 },
+                { value: "Courage", category: "HOD", avg: 4.75, orgAverage: 3.55 },
+                // Agility
+                { value: "Agility", category: "Self", avg: 5.00, orgAverage: 4.33 },
+                { value: "Agility", category: "Excluding Self", avg: 4.37, orgAverage: 3.92 },
+                { value: "Agility", category: "Manager", avg: 4.00, orgAverage: 3.59 },
+                { value: "Agility", category: "Subordinate", avg: 4.63, orgAverage: 4.10 },
+                { value: "Agility", category: "Peer", avg: 4.25, orgAverage: 3.95 },
+                { value: "Agility", category: "HOD", avg: 4.75, orgAverage: 3.45 },
+                // Collaboration
+                { value: "Collaboration", category: "Self", avg: 4.75, orgAverage: 4.45 },
+                { value: "Collaboration", category: "Excluding Self", avg: 4.35, orgAverage: 4.10 },
+                { value: "Collaboration", category: "Manager", avg: 4.00, orgAverage: 3.74 },
+                { value: "Collaboration", category: "Subordinate", avg: 4.75, orgAverage: 4.23 },
+                { value: "Collaboration", category: "Peer", avg: 4.21, orgAverage: 4.12 },
+                { value: "Collaboration", category: "HOD", avg: 4.25, orgAverage: 3.74 },
+                // Compassion
+                { value: "Compassion", category: "Self", avg: 4.50, orgAverage: 4.48 },
+                { value: "Compassion", category: "Excluding Self", avg: 3.90, orgAverage: 4.13 },
+                { value: "Compassion", category: "Manager", avg: 3.88, orgAverage: 3.93 },
+                { value: "Compassion", category: "Subordinate", avg: 4.50, orgAverage: 4.15 },
+                { value: "Compassion", category: "Peer", avg: 3.59, orgAverage: 4.15 },
+                { value: "Compassion", category: "HOD", avg: 3.50, orgAverage: 3.86 },
+            ];
+
+            const openEndedComments = {
+                continueDoing: [
+                    "Can do attitude, Speed and balancing commercial and execution priorities",
+                    "Sambandam should continue to be proactive and very solution oriented. Should continue to be always focussed on servicing the customer on time.",
+                    "Sets up a high standard for self and others",
+                    "Delivers high levels of performance",
+                    "Courageous and bold",
+                    "Being at forefront in setting processes",
+                    "- Identifying gaps and quickly plugging them",
+                    "- Process, Timing, and Control expertise",
+                    "Being collaborative and seeking feedback from all stakeholders. Questioning the status quo and taking initiatives towards better systems.",
+                    "He has a different and unique profile in this organization having skill to manage, hence he should focus continuing the same.",
+                    "Need to take up new Role Changes and bring Diverse Projects, extending his expertise in varied business needs and Challenges",
+                    "Sam has been leading from the front and has set up new bench marks ahead of times. I urge he continues the same",
+                    "Vision and strategy alignment; Empowering the team: Data driven decision making; adaptability to market changes; Nurturing customer-centric culture",
+                    "Strong execution in a distributed business model, idea to action at the shortest possible time",
+                    "Active listening, Confidence, influence, Decision making, Delegation",
+                    "Always support right talent, encourage them and motivate them",
+                    "If a person has the aspiration and determination, He/She can become an effective leader. Good leaders develop through a never-ending process of self-study, education, training, and experience."
+                ],
+                startDoing: [
+                    "Groom team, Leverage IT, innovation to transform market servicing",
+                    "Look at spreading the best practices quickly across the Organisation",
+                    "Sambandam should start working on his strategic skills. While he is sound on execution, can work on how to strategize and be a leader of a business.",
+                    "- Delegation of responsibilities",
+                    "- Improving self & team work-life balance",
+                    "- Empowering team to take correct decisions on their own",
+                    "Being more upfront in seeking feedbacks and more collaborative with teams.",
+                    "Estd clear goals and objectives; lead by example; Enhance Communication; Invest in team developement; Encourage accountability; Stay customer centric",
+                    "He should start delegating things and let the process / team take over now and see its effectiveness.",
+                    "Support Peers and Colleagues in more Complex task, which helps him and the Function a lot",
+                    "Take initiave in the new role / profile. Networking",
+                    "Work towards delegation",
+                    "Always support team members to challenge status quo",
+                    "He should be having one on one meeting with team members, Encouraging teams outing and more informal interaction.",
+                    "Listen and learn.",
+                    "Communicate efficiently.",
+                    "Make your best effort.",
+                    "Take responsibility.",
+                    "Set a powerful example for others.",
+                    "Include everyone.",
+                    "Strive for authenticity.",
+                    "Develop into a thought leader",
+                    "Process improvement thro latest technology."
+                ]
+            };
+
+            // Custom Bar Chart Component
+            const CustomBarChart = ({ data, valueKey, labelKey, barColor, backgroundColor, maxValue = 5 }) => {
+                return (
+                    <div className="custom-bar-chart-container">
+                        {data.map((item, index) => {
+                            const percentage = (item[valueKey] / maxValue) * 100;
+                            return (
+                                <div key={index} className="custom-bar-item">
+                                    <span className="custom-bar-label">{item[labelKey]}</span>
+                                    <div className="custom-bar-wrapper">
+                                        <div className="custom-bar-background" style={{ backgroundColor: backgroundColor }}></div>
+                                        <div className="custom-bar-fill" style={{ width: `${percentage}%`, backgroundColor: item.color || barColor }}>
+                                            <span className="custom-bar-value-overlay">{item[valueKey].toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div className="custom-bar-legend">
+                            {data.map((item, index) => (
+                                <div key={`legend-${index}`} className="custom-bar-legend-item">
+                                    <span className="custom-bar-legend-color" style={{ backgroundColor: item.color || barColor }}></span>
+                                    {item[labelKey]}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            // Custom Radar Chart Component
+            const CustomRadarChart = ({ data, selfKey, otherKey, selfColor, otherColor, maxValue = 5 }) => {
+                const centerX = 150;
+                const centerY = 150;
+                const radius = 100;
+                const numPoints = data.length;
+                const angleSlice = (Math.PI * 2) / numPoints;
+
+                const getCoordinatesForPoint = (index, value) => {
+                    const angle = angleSlice * index - Math.PI / 2; // Start from top
+                    const x = centerX + (radius * (value / maxValue)) * Math.cos(angle);
+                    const y = centerY + (radius * (value / maxValue)) * Math.sin(angle);
+                    return `${x},${y}`;
+                };
+
+                const selfPoints = data.map((d, i) => getCoordinatesForPoint(i, d[selfKey])).join(' ');
+                const otherPoints = data.map((d, i) => getCoordinatesForPoint(i, d[otherKey])).join(' ');
+
+                // Generate grid lines (concentric circles and axis lines)
+                const gridCircles = [0.2, 0.4, 0.6, 0.8, 1.0].map((r, i) => (
+                    <circle
+                        key={`circle-${i}`}
+                        cx={centerX}
+                        cy={centerY}
+                        r={radius * r}
+                        className="radar-grid-line"
+                        fill="none"
+                    />
+                ));
+
+                const axisLines = data.map((d, i) => (
+                    <line
+                        key={`axis-line-${i}`}
+                        x1={centerX}
+                        y1={centerY}
+                        x2={centerX + radius * Math.cos(angleSlice * i - Math.PI / 2)}
+                        y2={centerY + radius * Math.sin(angleSlice * i - Math.PI / 2)}
+                        className="radar-axis-line"
+                    />
+                ));
+
+                const axisLabels = data.map((d, i) => {
+                    const angle = angleSlice * i - Math.PI / 2;
+                    const x = centerX + (radius * 1.1) * Math.cos(angle);
+                    const y = centerY + (radius * 1.1) * Math.sin(angle);
+                    return (
+                        <text key={`label-${i}`} x={x} y={y} className="radar-axis-label">
+                            {d.subject}
+                        </text>
+                    );
+                });
+
+                return (
+                    <div className="custom-radar-chart-container">
+                        <svg className="radar-svg" width="100%" height="100%" viewBox="0 0 300 300">
+                            {gridCircles}
+                            {axisLines}
+                            <polygon points={otherPoints} fill={otherColor} className="radar-polygon" style={{ fillOpacity: 0.8, stroke: otherColor }} />
+                            <polygon points={selfPoints} fill={selfColor} className="radar-polygon" style={{ fillOpacity: 0.8, stroke: selfColor }} />
+                            {axisLabels}
+                        </svg>
+                        <div className="radar-legend">
+                            <div className="radar-legend-item">
+                                <span className="radar-legend-color" style={{ backgroundColor: selfColor }}></span>
+                                Your Self-Perception
+                            </div>
+                            <div className="radar-legend-item">
+                                <span className="radar-legend-color" style={{ backgroundColor: otherColor }}></span>
+                                Others' Perception
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+
+            // Main Dashboard Component
+            const Dashboard = ({ navigate }) => {
+              // Data for Radar Chart for 3 Critical Points
+              const radarChartData = [
+                {
+                  subject: 'Strategic Thinking',
+                  self: 5.00,
+                  excludingSelf: 3.92,
+                },
+                {
+                  subject: 'Delegation',
+                  self: 4.00,
+                  excludingSelf: 4.38,
+                },
+                {
+                  subject: 'External Awareness',
+                  self: 5.00,
+                  excludingSelf: 3.92,
+                },
+              ];
+
+              return (
+                <div className="min-h-screen bg-gray-100 p-6 font-inter text-gray-800">
+                  {/* Header Section */}
+                  <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
+                    <h1 className="text-4xl font-extrabold text-gray-900 mb-4 text-center">JSW Paints: Your Leadership Story</h1>
+                    <p className="text-lg italic text-gray-600 text-center max-w-3xl mx-auto">
+                      "Here's the story your colleagues, team, and manager are telling about your leadership today. These are the moments where you shine, and these are the chapters where you can grow."
+                    </p>
+                  </div>
+
+                  {/* Overall Leadership Snapshot */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-200">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Overall Leadership Snapshot</h2>
+                      <p className="text-gray-700 mb-4">
+                        A quick view of your overall performance as perceived by yourself, others, and how it compares to the organizational average.
+                      </p>                      
+                      <CustomBarChart
+                        data={overallScores}
+                        valueKey="score"
+                        labelKey="category"
+                        backgroundColor={colors.secondaryLightBlue}
+                        maxValue={5}
+                      />
+                      <p className="text-sm text-gray-500 mt-4">
+                        *Scores are on a scale of 1 to 5, where 5 indicates consistent demonstration of the behavior.
+                      </p>
+                    </div>
+
+                    {/* 3 Critical Points Radar Chart */}
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-200">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-4">3 Critical Points: Shaping Your Leadership</h2>
+                      <p className="text-gray-700 mb-4">
+                        These are key areas that emerge from your feedback, offering significant opportunities for growth.
+                      </p>
+                      <CustomRadarChart
+                        data={blindSpotsData}
+                        selfKey="self"
+                        otherKey="excludingSelf"
+                        selfColor={colors.positiveGreen}
+                        otherColor={colors.growthOrange}
+                        maxValue={5}
+                      />
+                      <ul className="list-disc list-inside text-gray-700 mt-4">
+                        <li className="font-semibold text-gray-800">Your Strategic Edge: Where You Lead, Others Follow</li>
+                        <li className="font-semibold text-gray-800">Empowering the Future: The Power of Delegation</li>
+                        <li className="font-semibold text-gray-800">The Visionary Gap: Staying Ahead of the Curve</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Strengths and Development Areas */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* Your Highlights (Strengths) */}
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-green-300">
+                      <h2 className="text-2xl font-bold text-green-700 mb-4">Your Highlights</h2>
+                      <p className="text-gray-700 mb-4">These are the behaviors where you consistently shine, as seen by your colleagues.</p>
+                      <div className="space-y-4">
+                        {strengthsData.map((s) => (
+                          <div key={s.sNo} className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-100">
+                            <p className="font-semibold text-lg text-green-800">{s.behavior}</p>
+                            <p className="text-sm text-gray-600">Average: <span className="font-bold text-green-700">{s.excludingSelf.toFixed(2)}</span></p>
+                            <p className="italic text-gray-500 mt-2">"{s.quote}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Opportunities for the Next Chapter (Development Areas) */}
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-orange-300">
+                      <h2 className="text-2xl font-bold text-orange-700 mb-4">Opportunities for the Next Chapter</h2>
+                      <p className="text-gray-700 mb-4">These are areas where focused effort can lead to significant growth.</p>
+                      <div className="space-y-4">
+                        {developmentData.map((d) => (
+                          <div key={d.sNo} className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-100">
+                            <p className="font-semibold text-lg text-orange-800">{d.behavior}</p>
+                            <p className="text-sm text-gray-600">Average: <span className="font-bold text-orange-700">{d.excludingSelf.toFixed(2)}</span></p>
+                            <p className="italic text-gray-500 mt-2">"{d.quote}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Perception Gap Snapshot */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* Your Plot Twists (Blind Spots) */}
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-red-300">
+                      <h2 className="text-2xl font-bold text-red-700 mb-4">Your Plot Twists: Where Perceptions Differ Most</h2>
+                      <p className="text-gray-700 mb-4">These are areas where your self-perception is notably higher than others' feedback – your potential blind spots.</p>
+                      <div className="space-y-4">
+                        {blindSpotsData.map((bs, index) => (
+                          <div key={index} className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-100">
+                            <p className="font-semibold text-lg text-red-800">{bs.subject}</p>
+                            <p className="text-sm text-gray-600">
+                              Self: <span className="font-bold text-red-700">{bs.self.toFixed(2)}</span> | Others: <span className="font-bold text-red-700">{bs.excludingSelf.toFixed(2)}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Hidden Treasures (Pleasant Surprises) */}
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-blue-300">
+                      <h2 className="text-2xl font-bold text-blue-700 mb-4">Hidden Treasures: Where Others See You Shine Even Brighter</h2>
+                      <p className="text-gray-700 mb-4">These are areas where others rated you higher than your self-perception – unexpected strengths to leverage!</p>
+                      <div className="space-y-4">
+                        {pleasantSurprisesData.map((ps) => (
+                          <div key={ps.sNo} className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-100">
+                            <p className="font-semibold text-lg text-blue-800">{ps.behavior}</p>
+                            <p className="text-sm text-gray-600">
+                              Self: <span className="font-bold text-blue-700">{ps.self.toFixed(2)}</span> | Others: <span className="font-bold text-blue-700">{ps.excludingSelf.toFixed(2)}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Plan */}
+                  <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-200 mb-8">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Write Your Next Chapter: Your Development Journey</h2>
+                    <p className="text-gray-700 mb-4">
+                      Based on your feedback, here are some areas to consider for your development plan. Remember, this is a suggestive guide to help you author your next chapter.
+                    </p>
+                    <div className="space-y-4 text-gray-700">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Suggested Action Area 1: Enhance Strategic Thinking & External Awareness</h3>
+                        <p>
+                          **Focus:** Deepen your understanding of market trends, competitive landscapes, and long-term business strategies to proactively identify new opportunities.
+                        </p>
+                        <p className="italic mt-1 text-gray-600">
+                          *Quick Tip: Consider exploring strategic planning courses, subscribing to industry publications, or seeking mentorship from senior leaders who excel in this area.*
+                        </p>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Suggested Action Area 2: Empower Through Delegation</h3>
+                        <p>
+                          **Focus:** Further empower your team by strategically delegating responsibilities, fostering their growth, and leveraging their capabilities more effectively.
+                        </p>
+                        <p className="italic mt-1 text-gray-600">
+                          *Quick Tip: Identify specific tasks or projects where you can empower team members, provide clear expectations, and trust them to deliver. Focus on coaching rather than micromanaging.*
+                        </p>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Suggested Action Area 3: Drive Continuous Process Improvement with Technology</h3>
+                        <p>
+                          **Focus:** Actively seek and implement process improvements, particularly leveraging new technologies, to enhance efficiency and drive organizational progress.
+                        </p>
+                        <p className="italic mt-1 text-gray-600">
+                          *Quick Tip: Engage with IT teams, explore new software solutions, and encourage your team to identify areas for automation and efficiency gains.*
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate('detailedReport')}
+                      className="mt-6 px-6 py-3 bg-blue-700 text-white font-bold rounded-full shadow-md hover:bg-blue-800 transition duration-300 ease-in-out transform hover:scale-105"
+                    >
+                      View Full 360 Report
+                    </button>
+                  </div>
+                </div>
+              );
+            };
+
+            // Detailed Report Component
+            const DetailedReport = ({ navigate }) => {
+              // Group competency details by competency name for easier rendering
+              const groupedCompetencies = competencyDetails.reduce((acc, item) => {
+                (acc[item.competency] = acc[item.competency] || []).push(item);
+                return acc;
+              }, {});
+
+              const groupedValues = valuesDetails.reduce((acc, item) => {
+                (acc[item.value] = acc[item.value] || []).push(item);
+                return acc;
+              }, {});
+
+              return (
+                <div className="min-h-screen bg-gray-100 p-6 font-inter text-gray-800">
+                  <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
+                    <h1 className="text-4xl font-extrabold text-gray-900 mb-4 text-center">Detailed 360 Feedback Report</h1>
+                    <p className="text-lg italic text-gray-600 text-center max-w-3xl mx-auto">
+                      Explore your competency and values scores in detail, comparing your self-perception with feedback from various rater groups and the organizational average.
+                    </p>
+                    <button
+                      onClick={() => navigate('dashboard')}
+                      className="mt-6 px-6 py-3 bg-blue-700 text-white font-bold rounded-full shadow-md hover:bg-blue-800 transition duration-300 ease-in-out transform hover:scale-105 block mx-auto"
+                    >
+                      Back to Main Dashboard
+                    </button>
+                  </div>
+
+                  {/* Competency Summary */}
+                  <div className="bg-white p-6 rounded-xl shadow-xl mb-8 border border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Competency Summary Category Wise</h2>
+                    {Object.entries(groupedCompetencies).map(([competencyName, data]) => (
+                      <div key={competencyName} className="mb-6 border-b pb-4 last:border-b-0 border-gray-100">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">{competencyName}</h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead>
+                              <tr className="bg-gray-50">
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Respondent Category</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Avg Score</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Org Average</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800">{item.category}</td>
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800 font-semibold">{item.avg.toFixed(2)}</td>
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800">{item.orgAverage.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="custom-bar-chart-container !h-[200px] !py-0">
+                            {data.map((item, index) => {
+                                const percentage = (item.avg / 5) * 100;
+                                const orgPercentage = (item.orgAverage / 5) * 100;
+                                return (
+                                    <div key={index} className="custom-bar-item !h-[20px] !mb-4">
+                                        <span className="custom-bar-label !min-w-[80px]">{item.category}</span>
+                                        <div className="custom-bar-wrapper">
+                                            <div className="custom-bar-background" style={{ backgroundColor: colors.secondaryLightBlue }}></div>
+                                            {/* Your Average Bar */}
+                                            <div className="custom-bar-fill" style={{ width: `${percentage}%`, backgroundColor: colors.primaryDarkBlue }}>
+                                                <span className="custom-bar-value-overlay !right-2">{item.avg.toFixed(2)}</span>
+                                            </div>
+                                            {/* Org Average Bar (as a thin line/marker) */}
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: `${orgPercentage}%`,
+                                                top: 0,
+                                                height: '100%',
+                                                width: '2px',
+                                                backgroundColor: colors.orgAverageTeal,
+                                                zIndex: 3
+                                            }}></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="custom-bar-legend !mt-4">
+                                <div className="custom-bar-legend-item">
+                                    <span className="custom-bar-legend-color" style={{ backgroundColor: colors.primaryDarkBlue }}></span>
+                                    Your Average
+                                </div>
+                                <div className="custom-bar-legend-item">
+                                    <span className="custom-bar-legend-color" style={{ backgroundColor: colors.orgAverageTeal }}></span>
+                                    Org Average
+                                </div>
+                            </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Values Summary */}
+                  <div className="bg-white p-6 rounded-xl shadow-xl mb-8 border border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Values Summary Category Wise</h2>
+                    {Object.entries(groupedValues).map(([valueName, data]) => (
+                      <div key={valueName} className="mb-6 border-b pb-4 last:border-b-0 border-gray-100">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">{valueName}</h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead>
+                              <tr className="bg-gray-50">
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Respondent Category</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Avg Score</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-700">Org Average</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800">{item.category}</td>
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800 font-semibold">{item.avg.toFixed(2)}</td>
+                                  <td className="py-2 px-4 border-b text-sm text-gray-800">{item.orgAverage.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="custom-bar-chart-container !h-[200px] !py-0">
+                            {data.map((item, index) => {
+                                const percentage = (item.avg / 5) * 100;
+                                const orgPercentage = (item.orgAverage / 5) * 100;
+                                return (
+                                    <div key={index} className="custom-bar-item !h-[20px] !mb-4">
+                                        <span className="custom-bar-label !min-w-[80px]">{item.category}</span>
+                                        <div className="custom-bar-wrapper">
+                                            <div className="custom-bar-background" style={{ backgroundColor: colors.secondaryLightBlue }}></div>
+                                            {/* Your Average Bar */}
+                                            <div className="custom-bar-fill" style={{ width: `${percentage}%`, backgroundColor: colors.primaryDarkBlue }}>
+                                                <span className="custom-bar-value-overlay !right-2">{item.avg.toFixed(2)}</span>
+                                            </div>
+                                            {/* Org Average Bar (as a thin line/marker) */}
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: `${orgPercentage}%`,
+                                                top: 0,
+                                                height: '100%',
+                                                width: '2px',
+                                                backgroundColor: colors.orgAverageTeal,
+                                                zIndex: 3
+                                            }}></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="custom-bar-legend !mt-4">
+                                <div className="custom-bar-legend-item">
+                                    <span className="custom-bar-legend-color" style={{ backgroundColor: colors.primaryDarkBlue }}></span>
+                                    Your Average
+                                </div>
+                                <div className="custom-bar-legend-item">
+                                    <span className="custom-bar-legend-color" style={{ backgroundColor: colors.orgAverageTeal }}></span>
+                                    Org Average
+                                </div>
+                            </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Open Ended Comments Section */}
+                  <div className="bg-white p-6 rounded-xl shadow-xl mb-8 border border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Open Ended Comments</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">What should the individual continue doing from a leadership perspective?</h3>
+                        <ul className="list-disc list-inside space-y-2 text-gray-700">
+                          {openEndedComments.continueDoing.map((comment, index) => (
+                            <li key={index}>{comment}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">What should the individual start doing to display consistent leadership capability?</h3>
+                        <ul className="list-disc list-inside space-y-2 text-gray-700">
+                          {openEndedComments.startDoing.map((comment, index) => (
+                            <li key={index}>{comment}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            };
+
+            // Main App Component with Routing
+            const App = () => {
+              const [currentPage, setCurrentPage] = useState('dashboard');
+
+              const navigate = (page) => {
+                setCurrentPage(page);
+              };
+
+              return (
+                <>
+                  {currentPage === 'dashboard' && <Dashboard navigate={navigate} />}
+                  {currentPage === 'detailedReport' && <DetailedReport navigate={navigate} />}
+                </>
+              );
+            };
+
+            // Mount the React app to the root div
+            ReactDOM.render(<App />, document.getElementById('root'));
+        }; // End of window.onload
+    </script>
+</body>
+</html>
